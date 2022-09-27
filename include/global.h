@@ -4,8 +4,20 @@
 #define CL_TARGET_OPENCL_VERSION 300
 #include <CL/cl.h>
 
+#include <cmath>
+#include <ctime>
 #include <cstdio>
 #include <memory>
+#include <string>
+
+#if defined(_MSC_VER)
+    #include <direct.h>
+    #define GetCurrentDir _getcwd
+#elif defined(__unix__)
+    #include <unistd.h>
+    #define GetCurrentDir getcwd
+#else
+#endif
 
 #define LOG(format, ...) \
     do { \

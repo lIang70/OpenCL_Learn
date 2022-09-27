@@ -14,6 +14,7 @@ class ClHost {
     // CL program object
     cl_program          program_        = nullptr;
     cl_kernel           kernel_         = nullptr;
+    cl_mem              mem_objects_[3] = { 0, 0, 0 };
 
 private:
     bool Init();
@@ -23,9 +24,13 @@ public:
     ClHost();
     ~ClHost();
 
-    void InitProgram(const char* source_file);
+    bool CreateProgram(const char* source_file);
+    void ClearProgram();
 
-    void Run();
+    void CreateMemoryObject(float *a, float *b, int size);
+    void ClearMemoryObject();
+
+    void Run(size_t size, void *result);
 };
 
 #endif // !_CL_HOST_H_

@@ -28,14 +28,14 @@ ClHost::Init() {
     }
 
     // Create the context.
-    context_ = clCreateContext(NULL, device_cnt, devices, NULL, NULL, &CL_status);
+    context_ = clCreateContext(nullptr, device_cnt, devices, nullptr, nullptr, &CL_status);
     if (CL_status != CL_SUCCESS) {
         LOG("ERROR: Failed to create context!");
         return false;
     }
 
     // Selects the first of the available devices to construct the command queue.
-    command_queue_ = clCreateCommandQueue(context_, devices[0], 0, nullptr);
+    command_queue_ = clCreateCommandQueueWithProperties(context_, devices[0], 0, nullptr);
     device_ = devices[0];
     delete[] devices;
 
@@ -44,11 +44,8 @@ ClHost::Init() {
 
 void
 ClHost::CleanUp() {
-    if (kernel_)
-        clReleaseKernel(kernel_);
-
-    if (program_)
-        clReleaseProgram(program_);
+    ClearMemoryObject();
+    ClearProgram();
 
     if (command_queue_)
         clReleaseCommandQueue(command_queue_);
@@ -59,12 +56,11 @@ ClHost::CleanUp() {
     if (device_)
         clReleaseDevice(device_);
 
-    if (paltform_)
-        delete[] paltform_;
+    clUnloadPlatformCompiler(paltform_);
 }
 
 ClHost::ClHost() {
-    if (Init()) {
+    if (!Init()) {
         LOG("ERROR: Failed to initialization!");
     }
 }
@@ -73,7 +69,117 @@ ClHost::~ClHost() {
     CleanUp();
 }
 
+bool 
+ClHost::CreateProgram(const char* source_file) {
+    // std::ifstream kernel_file_i(source_file, std::ios::in);
+    // if (!kernel_file_i.is_open()) {
+    //     LOG("Failed to open file for reading: %s", source_file);
+    // }
+
+    // std::ostringstream oss;
+    // oss << kernel_file_i.rdbuf();
+
+    // const char *src_str_ = oss.str().c_str();
+    // kernel_file_i.close();
+
+    FILE *kernel_file;
+    fopen_s(&kernel_file, source_file, "rb");
+    if (!kernel_file) {
+        LOG("Couldn't find the program file");
+        exit(1);
+    }
+
+    fseek(kernel_file, 0, SEEK_END);
+    size_t program_size = ftell(kernel_file);
+    rewind(kernel_file);
+    char *src_str = new char[program_size + 1];
+    src_str[program_size] = '\0';
+    fread(src_str, sizeof(char), program_size, kernel_file);
+    fclose(kernel_file);
+
+    program_ = clCreateProgramWithSource(context_, 1, (const char**)&src_str, nullptr, nullptr);
+
+    cl_int CL_status = clBuildProgram(program_, 0, nullptr, nullptr, nullptr, nullptr);
+    if (CL_status == CL_BUILD_PROGRAM_FAILURE) {
+        // Determine the size of the log
+        size_t log_size;
+        clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
+
+        // Allocate memory for the log
+        char* error_log = new char[log_size];
+
+        // Get the log
+        clGetProgramBuildInfo(program_, device_, CL_PROGRAM_BUILD_LOG, log_size, error_log, NULL);
+
+        // Print the log
+        LOG("error: %s \n", error_log);
+        delete[] error_log;
+        delete[] src_str;
+        return false;
+    } else if (CL_status != CL_SUCCESS) {
+        LOG("Failed to build program.");
+        delete[] src_str;
+        return false;
+    }
+
+    // Create the OpenCL kernel and allocate memory space.
+    kernel_ = clCreateKernel(program_, "vector_add_kernel", &CL_status);
+    if (CL_status != CL_SUCCESS) {
+        LOG("Failed to create kernel.");
+        delete[] src_str;
+        return false;
+    }
+
+    delete[] src_str;
+    return true;
+}
+
+
 void 
-ClHost::InitProgram(const char* source_file) {
-    
+ClHost::ClearProgram() {
+    if (kernel_)
+        clReleaseKernel(kernel_);
+
+    if (program_)
+        clReleaseProgram(program_);
+
+}
+
+void 
+ClHost::CreateMemoryObject(float *a, float *b, int size) {
+    mem_objects_[0] = clCreateBuffer(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                   sizeof(float) * size, a, NULL);
+    mem_objects_[1] = clCreateBuffer(context_, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                   sizeof(float) * size, b, NULL);
+    mem_objects_[2] = clCreateBuffer(context_, CL_MEM_READ_WRITE,
+                                   sizeof(float) * size, NULL, NULL);
+}
+
+void 
+ClHost::ClearMemoryObject() {
+    for (int i = 0; i < 3; i++) {
+        if (mem_objects_[i] != 0)
+            clReleaseMemObject(mem_objects_[i]);
+    }
+}
+
+void 
+ClHost::Run(size_t size, void *result) {
+    // Set the kernel data and execute the kernel
+    cl_int CL_status;
+    CL_status =  clSetKernelArg(kernel_, 0, sizeof(cl_mem), &mem_objects_[0]);
+    CL_status |= clSetKernelArg(kernel_, 1, sizeof(cl_mem), &mem_objects_[1]);
+    CL_status |= clSetKernelArg(kernel_, 2, sizeof(cl_mem), &mem_objects_[2]);
+
+    size_t global_work_size[1] = { size };
+    size_t local_work_size[1] = { 1 };
+
+    CL_status = clEnqueueNDRangeKernel( command_queue_, kernel_, 1, NULL,
+                                        global_work_size, local_work_size,
+                                        0, NULL, NULL);
+
+    // Fetch execution result
+    CL_status = clEnqueueReadBuffer(command_queue_, mem_objects_[2], CL_TRUE,
+                                    0, size * sizeof(float), result,
+                                    0, NULL, NULL);
 }
