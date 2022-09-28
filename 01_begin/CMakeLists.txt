@@ -5,12 +5,12 @@ PROJECT(01_begin)
 FILE(GLOB PROJECT_SOURCES "src/*.cc")
 
 # Add the source code to the project's executable。
-ADD_EXECUTABLE(begin_01 ${PROJECT_SOURCES})
+ADD_EXECUTABLE(01_begin ${PROJECT_SOURCES})
 # Set properties: output path
-SET_TARGET_PROPERTIES(begin_01  PROPERTIES 
+SET_TARGET_PROPERTIES(01_begin  PROPERTIES 
                                 RUNTIME_OUTPUT_DIRECTORY_DEBUG          ${CMAKE_SOURCE_DIR}/bin
                                 RUNTIME_OUTPUT_DIRECTORY_RELEASE        ${CMAKE_SOURCE_DIR}/bin
                                 RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_SOURCE_DIR}/bin
                                 RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL     ${CMAKE_SOURCE_DIR}/bin)
 
-TARGET_LINK_LIBRARIES(begin_01 PRIVATE OpenCL::OpenCL)
+TARGET_LINK_LIBRARIES(01_begin PRIVATE OpenCL::OpenCL)
