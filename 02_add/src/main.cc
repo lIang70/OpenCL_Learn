@@ -29,7 +29,7 @@ int main() {
     printf("Nomal calc:\n");
     clock_t t1 = clock();
     for (int j = 0; j < ARRAY_SIZE; j++) {
-        cpu_result[j] = a[j] * b[j];
+        cpu_result[j] = a[j] + b[j];
     }
 
     clock_t t2 = clock();
